@@ -215,13 +215,25 @@ def get_train_test_data(features, labels):
 
 
 def get_classifier(features, labels):
-    return svm.SVC(CACHE_SIZE).fit(features, labels)
+    print('Fitting model.....')
+    clf = svm.SVC(CACHE_SIZE).fit(features, labels)
+    print('Fitting model DONE')
+
+    return clf
+
+
+def get_score(clf, features, labels):
+    print('Calculating score.....')
+    score = clf.score(features, labels)
+    print('Calculating score DONE')
+
+    return score
 
 
 if __name__ == '__main__':
-    data = get_data(10000)
+    data = get_data(100000)
     features, labels = get_features(data)
     f_train, f_test, l_train, l_test = get_train_test_data(features, labels)
     clf = get_classifier(f_train, l_train)
-    score = clf.score(f_test, l_test)
+    score = get_score(clf, f_test, l_test)
     print('SCORE: {}%'.format(int(score * 100)))
