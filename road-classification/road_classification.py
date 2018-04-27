@@ -1,7 +1,6 @@
 """
 An SVC for road types.
 """
-import sys
 import csv
 import collections
 import statistics
@@ -11,6 +10,8 @@ import math
 from sklearn import svm
 import numpy as np
 from dateutil import parser
+from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 
 class Column(IntEnum):
@@ -20,41 +21,12 @@ class Column(IntEnum):
     LON = 3
     LAT = 4
     VEHICLE_TYPE = 5
-    CLASSIFICATION = 6
+    LABEL = 6
 
 
 CACHE_SIZE = 1000
-classification_names = None
+label_names = None
 
-
-# def debug() -> None:
-#     """
-#     for testing
-#     """
-#     training_features = np.ascontiguousarray([[0, 0], [1, 1]],
-#                                              dtype=np.float32)
-#     training_labels = np.ascontiguousarray([0, 1], dtype=np.float32)
-
-#     # feature scale features
-
-#     assert training_labels.flags['C_CONTIGUOUS'], \
-#         ("training labels aren't C_CONTIGUOUS")
-#     assert training_features.flags['C_CONTIGUOUS'], \
-#         ("training features aren't C_CONTIGUOUS")
-
-#     road_classifier.fit(training_features, training_labels)
-
-#     print(road_classifier.predict([[2., 2.]]))
-
-# def main():
-#     """
-#     Classify roads.
-#     """
-#     raw_data = load_data(sys.argv[1:])
-#     feature_vectors  = make_feature_vectors(raw_data)
-#     labels = make_labels(raw_data)
-#     road_classifier = svm.SVC(CACHE_SIZE)
-#     train()
 
 # distance between two points in miles
 # see: https://www.johndcook.com/blog/python_longitude_latitude/
@@ -82,8 +54,8 @@ def distance_on_unit_sphere(lat1, long1, lat2, long2):
     cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2)
            + math.cos(phi1)*math.cos(phi2))
 
-    print('COS = {}'.format(cos))
-    # TODO: sometimes cos > 1?
+    # print('COS = {}'.format(cos))
+    # sometimes cos > 1?
     if cos > 1:
         # ¯\_(ツ)_/¯
         cos = 1
@@ -101,12 +73,18 @@ def get_data(limit):
 
     for fname in fnames:
         with open(fname) as f:
-            count = 0
             vehicle_type = fname.split('/')[2]
             seen_s = False
             prev = None
 
-            for datum in csv.reader(f, delimiter=","):
+            reader = tqdm(csv.reader(f, delimiter=","))
+            for count, datum in enumerate(reader):
+                if count >= limit:
+                    break
+
+                reader.set_description_str('Processing row {}/{} in {}'
+                                           .format(count, limit, fname))
+
                 datum = [parser.parse(datum[3]), datum[6].lower(),
                          int(datum[7]), float(datum[8]), float(datum[9]),
                          vehicle_type, datum[15]]
@@ -129,21 +107,16 @@ def get_data(limit):
 
                 data.append(datum)
 
-                count += 1
-                if count >= limit:
-                    break
-
                 prev = datum
 
-    # map classifications to ints
-    global classification_names
-    # get a set of all unique classifications then convert to a list
+    # map labels to ints
+    global label_names
+    # get a set of all unique labels then convert to a list
     # so that it is indexable
-    classification_names = list(set([datum[Column.CLASSIFICATION]
-                                for datum in data]))
+    label_names = list(set([datum[Column.LABEL] for datum in data]))
     for datum in data:
-        datum[Column.CLASSIFICATION] = classification_names.index(
-            datum[Column.CLASSIFICATION])
+        datum[Column.LABEL] = label_names.index(
+            datum[Column.LABEL])
 
     return data
 
@@ -151,14 +124,19 @@ def get_data(limit):
 def get_features(data):
     roads = collections.defaultdict(
         lambda: {'num_truck': 0, 'num_pv': 0, 'speeds': [],
-                 'classification': -1})
+                 'label': -1})
 
     prev = None
-    for datum in data:
-        date, trip_char, road_id, lon, lat, vehicle_type, classification =\
+    data_tqdm = tqdm(data)
+    data_len = len(data)
+    for idx, datum in enumerate(data_tqdm):
+        data_tqdm.set_description_str('Processing datum {}/{}'
+                                      .format(idx, data_len))
+
+        date, trip_char, road_id, lon, lat, vehicle_type, label =\
             datum
 
-        roads[road_id]['classification'] = classification
+        roads[road_id]['label'] = label
 
         # add to vehicle count
         vehicle_key = 'num_truck' if vehicle_type == 'truck' else 'num_pv'
@@ -180,6 +158,10 @@ def get_features(data):
             miles = distance_on_unit_sphere(lat, lon, prev_lat,
                                             prev_lon)
 
+            # things happen
+            if miles == 0 or hours == 0:
+                continue
+
             speed = miles / hours
             # print('MILES = {}, HOURS = {}, SPEED = {}'
             #       .format(miles, hours, speed))
@@ -188,14 +170,18 @@ def get_features(data):
         prev = datum
 
     features = []
-    classifications = []
-    for k, v in roads.items():
-        num_truck, num_pv, speeds, classification = (v['num_truck'],
-                                                     v['num_pv'], v['speeds'],
-                                                     v['classification'])
+    labels = []
+    roads_len = len(roads)
+    roads_tqdm = tqdm(enumerate(roads.items()))
+    for i, (k, v) in roads_tqdm:
+        roads_tqdm.set_description_str('Creating feature vector {}/{}'
+                                       .format(i, roads_len))
+
+        num_truck, num_pv, speeds, label = (v['num_truck'], v['num_pv'],
+                                            v['speeds'], v['label'])
         speeds.sort()
 
-        # TODO: for some reason some roads have no speeds?
+        # for some reason some roads have no speeds?
         if not speeds:
             continue
 
@@ -215,18 +201,27 @@ def get_features(data):
             # percentage of pv on road
             num_pv / (num_pv + num_truck),
             # percentage of truck on road
-            num_truck / (num_pv + num_truck)
-        ])
-        classifications.append(classification)
+            num_truck / (num_pv + num_truck)])
+        labels.append(label)
 
-    return (features, classifications)
+    return (features, labels)
+
+
+def get_train_test_data(features, labels):
+    return [
+        np.ascontiguousarray(arr, dtype=np.float32)
+        for arr
+        in train_test_split(features, labels, test_size=.4, random_state=0)]
+
+
+def get_classifier(features, labels):
+    return svm.SVC(CACHE_SIZE).fit(features, labels)
 
 
 if __name__ == '__main__':
-    data = get_data(1000)
-    features, classifications = get_features(data)
-    print(features)
-    print('-------------------------------------------------')
-    print(classifications)
-    print('-------------------------------------------------')
-    print(classification_names)
+    data = get_data(10000)
+    features, labels = get_features(data)
+    f_train, f_test, l_train, l_test = get_train_test_data(features, labels)
+    clf = get_classifier(f_train, l_train)
+    score = clf.score(f_test, l_test)
+    print('SCORE: {}%'.format(int(score * 100)))
