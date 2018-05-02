@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class Plotter():
-    
+
     DEFAULT_LINES_READ = 10000;
 
     def __init__(self, csvfile, lines_read=DEFAULT_LINES_READ):
@@ -21,27 +21,27 @@ class Plotter():
         after_points = []
         rowCounter = 0
         for row in csv:
-        	rowCounter += 1
-        	print rowCounter
-        	if rowCounter == lines_read:
-        		break
-        	before_points_pair = [row[1],row[2]]
-	        after_points_pair = [row[8], row[9]]
-	        before_points.append(before_points_pair)
-	        print "before points" + str(before_points_pair)
-	        print "after points" + str(after_points_pair)
-	        after_points.append(after_points_pair)
+            rowCounter += 1
+            print rowCounter
+            if rowCounter == lines_read:
+                break
+            before_points_pair = [row[1],row[2]]
+            after_points_pair = [row[8], row[9]]
+            before_points.append(before_points_pair)
+            print "before points" + str(before_points_pair)
+            print "after points" + str(after_points_pair)
+            after_points.append(after_points_pair)
         return before_points, after_points  
 
     def plot_coords(self, before_points, after_points):
         fig, axes = plt.subplots(2, 1)
         m = Basemap(projection='cass',
-                resolution='i',
-                lon_0 = 114.077183,
-              lat_0 = 22.662677,
-              width = 80000,
-              height = 40000,
-              ax=axes[0]);
+                    resolution='i',
+                    lon_0 = 114.077183,
+                    lat_0 = 22.662677,
+                    width = 80000,
+                    height = 40000,
+                    ax=axes[0]);
         axes[0].set_title('Before MapMatching')
         m.bluemarble(scale = 0.5);
         m.drawcoastlines();
@@ -51,12 +51,12 @@ class Plotter():
             x,y = m(lon, lat)
             m.plot(x, y, 'bo', markersize=.25)
         m = Basemap(projection='cass',
-                resolution='i',
-                lon_0 = 114.077183,
-              lat_0 = 22.662677,
-              width = 80000,
-              height = 40000,
-              ax=axes[1]);
+                    resolution='i',
+                    lon_0 = 114.077183,
+                    lat_0 = 22.662677,
+                    width = 80000,
+                    height = 40000,
+                    ax=axes[1]);
         axes[1].set_title('After MapMatching')
         m.bluemarble(scale = 0.5);
         m.drawcoastlines();
@@ -72,11 +72,11 @@ class Plotter():
         ax=fig.add_axes([0.1,0.1,0.8,0.8])
         # setup map projection.
         m = Basemap(projection='cass',
-                resolution='i',
-                lon_0 = 114.077183,
-              lat_0 = 22.662677,
-              width = 120000,
-              height = 50000);
+                    resolution='i',
+                    lon_0 = 114.077183,
+                    lat_0 = 22.662677,
+                    width = 120000,
+                    height = 50000);
         m.bluemarble(scale = 0.5);
         m.drawcoastlines();
         ax.set_title('Before MapMatching')
@@ -92,11 +92,11 @@ class Plotter():
         ax=fig.add_axes([0.1,0.1,0.8,0.8])
         # setup map projection.
         m = Basemap(projection='cass',
-                resolution='i',
-              lon_0 = 114.077183,
-              lat_0 = 22.662677,
-              width = 120000,
-              height = 50000);
+                    resolution='i',
+                    lon_0 = 114.077183,
+                    lat_0 = 22.662677,
+                    width = 120000,
+                    height = 50000);
         m.bluemarble(scale = 0.5);
         m.drawcoastlines();
         ax.set_title('After MapMatching')

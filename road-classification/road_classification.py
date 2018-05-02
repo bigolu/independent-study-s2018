@@ -24,7 +24,7 @@ class Column(IntEnum):
     LABEL = 6
 
 
-CACHE_SIZE = 1000
+CACHE_SIZE = 4000
 label_names = None
 
 
@@ -54,7 +54,6 @@ def distance_on_unit_sphere(lat1, long1, lat2, long2):
     cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2)
            + math.cos(phi1)*math.cos(phi2))
 
-    # print('COS = {}'.format(cos))
     # sometimes cos > 1?
     if cos > 1:
         # ¯\_(ツ)_/¯
@@ -153,8 +152,6 @@ def get_features(data):
 
             prev_lat = prev[Column.LAT]
             prev_lon = prev[Column.LON]
-            # print('LAT = {}, LON = {}, PREVLAT = {}, PREVLON = {}'
-            #       .format(lat, lon, prev_lat, prev_lon))
             miles = distance_on_unit_sphere(lat, lon, prev_lat,
                                             prev_lon)
 
@@ -163,8 +160,6 @@ def get_features(data):
                 continue
 
             speed = miles / hours
-            # print('MILES = {}, HOURS = {}, SPEED = {}'
-            #       .format(miles, hours, speed))
             roads[road_id]['speeds'].append(speed)
 
         prev = datum
@@ -216,7 +211,7 @@ def get_train_test_data(features, labels):
 
 def get_classifier(features, labels):
     print('Fitting model.....')
-    clf = svm.SVC(CACHE_SIZE).fit(features, labels)
+    clf = svm.SVC(cache_size=CACHE_SIZE).fit(features, labels)
     print('Fitting model DONE')
 
     return clf
@@ -231,7 +226,7 @@ def get_score(clf, features, labels):
 
 
 if __name__ == '__main__':
-    data = get_data(100000)
+    data = get_data(1_000_000_000)
     features, labels = get_features(data)
     f_train, f_test, l_train, l_test = get_train_test_data(features, labels)
     clf = get_classifier(f_train, l_train)
